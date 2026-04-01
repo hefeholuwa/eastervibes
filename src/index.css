@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-on-surface-variant: #625f53;
+  --color-tertiary-dim: #a8003e;
+  --color-outline: #7e7b6d;
+  --color-primary-fixed-dim: #ff9974;
+  --color-tertiary: #be0147;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-surface: #353328;
+  --color-surface-variant: #e8e2d2;
+  --color-surface-tint: #a53d12;
+  --color-tertiary-container: #ff9dab;
+  --color-on-tertiary-fixed: #490016;
+  --color-surface-container-low: #f8f3e8;
+  --color-surface-container-high: #ede8d9;
+  --color-tertiary-fixed-dim: #ff869a;
+  --color-on-error: #fff7f6;
+  --color-on-background: #353328;
+  --color-on-primary-fixed-variant: #7f2700;
+  --color-outline-variant: #b6b2a3;
+  --color-on-tertiary-container: #730027;
+  --color-inverse-on-surface: #a09d94;
+  --color-on-secondary-fixed-variant: #6a6546;
+  --color-secondary: #646041;
+  --color-secondary-dim: #585436;
+  --color-background: #fef9ef;
+  --color-surface: #fef9ef;
+  --color-on-primary: #fff7f5;
+  --color-on-tertiary-fixed-variant: #83002e;
+  --color-on-error-container: #65000b;
+  --color-primary-dim: #953205;
+  --color-inverse-surface: #0f0e09;
+  --color-on-secondary-container: #5f5b3c;
+  --color-on-tertiary: #fff7f7;
+  --color-error-dim: #70030f;
+  --color-secondary-fixed: #f9f2ca;
+  --color-secondary-container: #f9f2ca;
+  --color-on-secondary: #fff9e3;
+  --color-surface-container-highest: #e8e2d2;
+  --color-primary-fixed: #ffad91;
+  --color-tertiary-fixed: #ff9dab;
+  --color-on-secondary-fixed: #4c492c;
+  --color-error: #ac3434;
+  --color-primary: #a53d12;
+  --color-surface-bright: #fef9ef;
+  --color-inverse-primary: #fe7e4f;
+  --color-error-container: #f56965;
+  --color-on-primary-fixed: #4d1400;
+  --color-secondary-fixed-dim: #eae3bc;
+  --color-surface-dim: #dfdac9;
+  --color-primary-container: #ffad91;
+  --color-surface-container: #f3ede0;
+  --color-on-primary-container: #702100;
+
+  --font-headline: "Newsreader", serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-label: "Plus Jakarta Sans", sans-serif;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+h1, h2, h3, h4, h5, h6, .font-headline {
+  font-family: var(--font-headline);
+}
