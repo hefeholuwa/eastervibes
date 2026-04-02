@@ -314,6 +314,23 @@ export default function LiveBoard() {
     return participantMatches || authorMatches;
   }, [effectName, isHost, isLocked, myParticipantId, room?.moveMode]);
 
+  const canManageItem = useCallback((item: BoardItem) => {
+    if (isHost) return true;
+
+    const participantMatches = Boolean(
+      item.participantId && myParticipantId && item.participantId === myParticipantId,
+    );
+    const authorMatches =
+      Boolean(item.author) &&
+      item.author.trim().toLowerCase() === effectName.trim().toLowerCase();
+
+    if (!item.participantId) {
+      return authorMatches;
+    }
+
+    return participantMatches || authorMatches;
+  }, [effectName, isHost, myParticipantId]);
+
   // Filter items by lane
   const filteredItems = useMemo(() => {
     if (!activeLane) return items;
@@ -811,7 +828,7 @@ export default function LiveBoard() {
             style={{ width: boardWidth, height: stageHeight, transform: `scale(${viewScale})` }}
           >
             {filteredItems.map((item) => {
-              const isOwn = item.participantId === myParticipantId;
+              const canManage = canManageItem(item);
               const canDrag = canMoveItem(item);
               const myReaction = myParticipantId ? item.reactedBy[myParticipantId] : undefined;
               const displayPosition = clampItemPosition(item, { x: item.x, y: item.y });
@@ -834,7 +851,7 @@ export default function LiveBoard() {
                   style={{ left: displayPosition.x, top: displayPosition.y, touchAction: "none" }}
                 >
                   {/* Actions — own posts or host */}
-                  {(isOwn || isHost) ? (
+                  {canManage ? (
                     <div className="absolute z-20 top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       {isHost ? (
                         <button
