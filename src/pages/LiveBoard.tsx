@@ -232,7 +232,7 @@ export default function LiveBoard() {
 
   useEffect(() => {
     if (room?.id && room.name) {
-      saveRecentBoard({ id: room.id, name: room.name });
+      saveRecentBoard({ id: room.id, name: room.name, shortCode: room.shortCode });
     }
   }, [room]);
 

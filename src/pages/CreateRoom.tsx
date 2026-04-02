@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles, Lock, Globe, User } from "lucide-react";
+import { ArrowLeft, Sparkles, User, Hash } from "lucide-react";
 import { createRoom, storeDisplayName } from "../lib/board";
 
 export default function CreateRoom() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [hostName, setHostName] = useState("");
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [shortCode, setShortCode] = useState("");
   const [theme, setTheme] = useState("warm");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -21,9 +21,9 @@ export default function CreateRoom() {
       const displayName = hostName.trim() || "Host";
       const roomId = await createRoom({
         name,
-        visibility,
         theme,
         hostName: displayName,
+        shortCode,
       });
       storeDisplayName(roomId, displayName);
 
@@ -95,6 +95,33 @@ export default function CreateRoom() {
             </div>
 
             <div className="space-y-3">
+              <label htmlFor="shortCode" className="block text-sm font-bold text-on-surface uppercase tracking-wider">
+                Room Code
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Hash className="h-5 w-5 text-on-surface-variant/50" />
+                </div>
+                <input
+                  id="shortCode"
+                  type="text"
+                  value={shortCode}
+                  onChange={(e) =>
+                    setShortCode(
+                      e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6),
+                    )
+                  }
+                  placeholder="AUTO"
+                  maxLength={6}
+                  className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary rounded-2xl pl-12 pr-5 py-4 text-base sm:text-lg font-bold tracking-[0.24em] uppercase outline-none transition-colors placeholder:text-on-surface-variant/40"
+                />
+              </div>
+              <p className="text-sm text-on-surface-variant">
+                Optional. Leave it blank and we will generate a 6-character code for you.
+              </p>
+            </div>
+
+            <div className="space-y-3">
               <label className="block text-sm font-bold text-on-surface uppercase tracking-wider">
                 Vibe Selection
               </label>
@@ -118,45 +145,6 @@ export default function CreateRoom() {
                     <span className="font-medium block">{t.name}</span>
                   </button>
                 ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-sm font-bold text-on-surface uppercase tracking-wider">
-                Room Visibility
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <button
-                  type="button"
-                  onClick={() => setVisibility("public")}
-                  className={`flex items-start gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${
-                    visibility === "public"
-                      ? "border-primary bg-primary-container/10"
-                      : "border-outline-variant/30 hover:border-outline-variant"
-                  }`}
-                >
-                  <Globe className={`w-6 h-6 shrink-0 ${visibility === "public" ? "text-primary" : "text-on-surface-variant"}`} />
-                  <div className="text-left">
-                    <span className="font-bold block mb-1">Public</span>
-                    <span className="text-sm text-on-surface-variant">Anyone with the link can join and post.</span>
-                  </div>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setVisibility("private")}
-                  className={`flex items-start gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${
-                    visibility === "private"
-                      ? "border-primary bg-primary-container/10"
-                      : "border-outline-variant/30 hover:border-outline-variant"
-                  }`}
-                >
-                  <Lock className={`w-6 h-6 shrink-0 ${visibility === "private" ? "text-primary" : "text-on-surface-variant"}`} />
-                  <div className="text-left">
-                    <span className="font-bold block mb-1">Private</span>
-                    <span className="text-sm text-on-surface-variant">Only approved guests can join.</span>
-                  </div>
-                </button>
               </div>
             </div>
 

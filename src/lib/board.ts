@@ -146,14 +146,15 @@ export type Participant = {
 export type RecentBoard = {
   id: string;
   name: string;
+  shortCode?: string;
   lastVisitedAt: number;
 };
 
 type CreateRoomInput = {
   name: string;
-  visibility: RoomVisibility;
   theme: string;
   hostName: string;
+  shortCode?: string;
 };
 
 type AddNoteInput = {
@@ -343,6 +344,10 @@ export function generateShortCode(): string {
   return code;
 }
 
+function normalizeShortCode(value: string) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+}
+
 // ─── Local storage helpers ────────────────────────────────────────────────────
 
 const GLOBAL_NAME_KEY = "vibe-global-name";
@@ -412,6 +417,7 @@ export function getRecentBoards(): RecentBoard[] {
           entry &&
           typeof entry.id === "string" &&
           typeof entry.name === "string" &&
+          (typeof entry.shortCode === "string" || typeof entry.shortCode === "undefined") &&
           typeof entry.lastVisitedAt === "number",
       )
       .sort((left, right) => right.lastVisitedAt - left.lastVisitedAt);
@@ -420,7 +426,7 @@ export function getRecentBoards(): RecentBoard[] {
   }
 }
 
-export function saveRecentBoard(board: Pick<RecentBoard, "id" | "name">) {
+export function saveRecentBoard(board: Pick<RecentBoard, "id" | "name" | "shortCode">) {
   if (typeof window === "undefined") return;
 
   const nextEntry: RecentBoard = {
@@ -436,11 +442,38 @@ export function saveRecentBoard(board: Pick<RecentBoard, "id" | "name">) {
 
 export async function createRoom(input: CreateRoomInput) {
   const roomId = buildRoomId(input.name);
-  const shortCode = generateShortCode();
+  const preferredCode = normalizeShortCode(input.shortCode ?? "");
+  let shortCode = "";
+
+  if (preferredCode) {
+    if (preferredCode.length !== 6) {
+      throw new Error("Room codes must be exactly 6 letters or numbers.");
+    }
+
+    const existingRoom = await findRoomByCode(preferredCode);
+    if (existingRoom) {
+      throw new Error("That room code is already taken. Try another one.");
+    }
+
+    shortCode = preferredCode;
+  } else {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = generateShortCode();
+      const existingRoom = await findRoomByCode(candidate);
+      if (!existingRoom) {
+        shortCode = candidate;
+        break;
+      }
+    }
+
+    if (!shortCode) {
+      throw new Error("We couldn't generate a unique room code right now. Please try again.");
+    }
+  }
 
   await set(roomRef(roomId), {
     name: input.name,
-    visibility: input.visibility,
+    visibility: "public",
     theme: input.theme,
     shortCode,
     allowPosts: true,

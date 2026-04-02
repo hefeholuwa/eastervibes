@@ -44,7 +44,6 @@ export default function LandingPage() {
     try {
       const roomId = await createRoom({
         name: "Demo Board",
-        visibility: "public",
         theme: "warm",
         hostName: "Demo Host",
       });
@@ -117,30 +116,49 @@ export default function LandingPage() {
           </button>
         </div>
 
-        {/* Join by Code */}
-        <div className="mt-8 sm:mt-10 w-full max-w-md">
-          <div className="bg-surface-container-lowest/85 border border-outline-variant/25 rounded-2xl p-4 sm:p-5 shadow-sm backdrop-blur-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-on-surface-variant mb-3 flex items-center gap-2">
-              <Hash className="w-4 h-4 text-primary" /> Have a room code?
-            </p>
-            <form onSubmit={(e) => { e.preventDefault(); handleJoinByCode(); }} className="flex gap-3">
+        <div className="mt-5 w-full max-w-md">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleJoinByCode();
+            }}
+            className="rounded-full border border-outline-variant/25 bg-surface-container-lowest/90 p-2 shadow-sm backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
+                <Hash className="w-4 h-4" />
+              </div>
               <input
                 type="text"
                 value={roomCode}
-                onChange={(e) => { setRoomCode(e.target.value.toUpperCase().slice(0, 6)); setCodeError(""); }}
-                placeholder="ABC123"
+                onChange={(e) => {
+                  setRoomCode(e.target.value.toUpperCase().slice(0, 6));
+                  setCodeError("");
+                }}
+                placeholder="Enter room code"
                 maxLength={6}
-                className="flex-1 bg-surface-container-low border-2 border-transparent focus:border-primary rounded-xl px-4 py-3 text-base font-bold tracking-[0.3em] text-center uppercase outline-none transition-colors placeholder:text-on-surface-variant/40 placeholder:tracking-[0.3em]"
+                className="min-w-0 flex-1 bg-transparent px-2 text-sm font-bold tracking-[0.24em] uppercase text-on-surface outline-none placeholder:text-on-surface-variant/45 placeholder:tracking-[0.08em]"
               />
               <button
                 type="submit"
                 disabled={isJoining || roomCode.length < 6}
-                className="bg-primary text-on-primary px-5 py-3 rounded-xl font-bold text-sm hover:bg-primary-dim transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                className="rounded-full bg-primary px-4 py-3 text-sm font-bold text-on-primary transition-colors hover:bg-primary-dim disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isJoining ? "..." : "Join"}
               </button>
-            </form>
-            {codeError ? <p className="text-sm text-error mt-2">{codeError}</p> : null}
+            </div>
+          </form>
+          <div className="mt-2 flex items-center justify-center gap-2 text-xs">
+            {codeError ? (
+              <p className="text-error">{codeError}</p>
+            ) : (
+              <>
+                <span className="text-on-surface-variant">Need a code?</span>
+                <Link to="/create" className="font-bold uppercase tracking-[0.16em] text-primary hover:text-primary-dim transition-colors">
+                  Create one
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -201,7 +219,9 @@ export default function LandingPage() {
                 >
                   <div>
                     <p className="font-bold text-on-surface">{board.name}</p>
-                    <p className="text-sm text-on-surface-variant">Board code: {board.id}</p>
+                    <p className="text-sm text-on-surface-variant">
+                      {board.shortCode ? `Room code: ${board.shortCode}` : "Saved board"}
+                    </p>
                   </div>
                   <div className="flex gap-3">
                     <Link

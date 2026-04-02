@@ -1,8 +1,9 @@
 {
   "rules": {
     "rooms": {
+      ".read": true,
+      ".indexOn": ["shortCode"],
       "$roomId": {
-        ".read": true,
         ".write": true,
         "items": {
           ".read": true,
