@@ -5,6 +5,7 @@ import JoinRoom from "./pages/JoinRoom";
 import LiveBoard from "./pages/LiveBoard";
 import Moderation from "./pages/Moderation";
 import Summary from "./pages/Summary";
+import NotFound from "./pages/NotFound";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/board/:id" element={<LiveBoard />} />
         <Route path="/board/:id/moderation" element={<Moderation />} />
         <Route path="/summary/:id" element={<Summary />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
