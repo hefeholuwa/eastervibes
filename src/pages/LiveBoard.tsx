@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   Download,
+  Eye,
   Hash,
   Image as ImageIcon,
   Link2,
@@ -83,6 +84,7 @@ export default function LiveBoard() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageCaption, setImageCaption] = useState("");
+  const [activeImage, setActiveImage] = useState<BoardItem | null>(null);
   const [noteColor, setNoteColor] = useState<NoteColor>("yellow");
   const [selectedLane, setSelectedLane] = useState("");
   const [isPosting, setIsPosting] = useState(false);
@@ -533,6 +535,11 @@ export default function LiveBoard() {
     return match?.bg ?? "bg-yellow-100";
   };
 
+  const handleOpenImage = useCallback((item: BoardItem) => {
+    if (item.type !== "image") return;
+    setActiveImage(item);
+  }, []);
+
   return (
     <div className="h-[100svh] w-screen overflow-hidden bg-surface relative font-body">
       <header className="absolute top-0 left-0 right-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 pointer-events-none">
@@ -764,8 +771,30 @@ export default function LiveBoard() {
                 <p className="text-sm font-medium text-on-surface">{pinnedItem.content}</p>
               ) : (
                 <>
-                  <img src={pinnedItem.imageUrl} alt="Pinned" className="w-full h-32 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                  <button
+                    type="button"
+                    onClick={() => handleOpenImage(pinnedItem)}
+                    className="block w-full overflow-hidden rounded-xl"
+                  >
+                    <img src={pinnedItem.imageUrl} alt="Pinned" className="w-full h-32 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                  </button>
                   {pinnedItem.caption ? <p className="text-xs text-on-surface/80 mt-2">{pinnedItem.caption}</p> : null}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenImage(pinnedItem)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-bold text-on-surface"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> View
+                    </button>
+                    <a
+                      href={pinnedItem.imageUrl}
+                      download={`vibeboard-${pinnedItem.author}-${pinnedItem.id}.jpg`}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-bold text-on-surface"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download
+                    </a>
+                  </div>
                 </>
               )}
               <p className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider mt-2">
@@ -841,7 +870,14 @@ export default function LiveBoard() {
                   ) : (
                     <>
                       <div className="relative group/img">
-                        <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-32 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleOpenImage(item); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="block w-full overflow-hidden rounded-xl text-left"
+                        >
+                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-32 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                        </button>
                         <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 p-2 rounded-full bg-inverse-surface/60 text-inverse-on-surface opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
                           <Download className="w-4 h-4" />
                         </a>
@@ -852,6 +888,25 @@ export default function LiveBoard() {
                         <p className="text-[10px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                           {room?.anonymousMode ? "Anonymous" : item.author}
                         </p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleOpenImage(item); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1.5 text-[11px] font-bold text-on-surface hover:bg-surface-variant transition-colors"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View
+                          </button>
+                          <a
+                            href={item.imageUrl}
+                            download={`vibeboard-${item.author}-${item.id}.jpg`}
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1.5 text-[11px] font-bold text-on-surface hover:bg-surface-variant transition-colors"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Save
+                          </a>
+                        </div>
                       </div>
                     </>
                   )}
@@ -996,6 +1051,48 @@ export default function LiveBoard() {
                 <Check className="w-5 h-5" />
                 {isPosting ? "Posting..." : room?.requireApproval && !isHost ? "Submit for Review" : "Post to Board"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeImage && activeImage.type === "image" ? (
+        <div className="fixed inset-0 z-[70] bg-inverse-surface/75 backdrop-blur-md p-4 sm:p-6">
+          <div className="mx-auto flex h-full w-full max-w-5xl flex-col justify-center">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                {activeImage.caption ? (
+                  <p className="truncate text-sm font-medium text-inverse-on-surface">{activeImage.caption}</p>
+                ) : null}
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-inverse-on-surface/70">
+                  {room?.anonymousMode ? "Anonymous" : activeImage.author}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={activeImage.imageUrl}
+                  download={`vibeboard-${activeImage.author}-${activeImage.id}.jpg`}
+                  className="inline-flex items-center gap-2 rounded-full bg-surface-container-lowest px-4 py-2 text-sm font-bold text-on-surface"
+                >
+                  <Download className="h-4 w-4" /> Download
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setActiveImage(null)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-[2rem] bg-surface-container-lowest p-2 shadow-2xl">
+              <img
+                src={activeImage.imageUrl}
+                alt={activeImage.caption || `${activeImage.author}'s post`}
+                className="max-h-[75svh] w-full rounded-[1.5rem] object-contain bg-black/5"
+                referrerPolicy="no-referrer"
+              />
             </div>
           </div>
         </div>
