@@ -427,12 +427,21 @@ export default function LiveBoard() {
 
       const itemWidth = getItemWidth(candidate);
       const itemHeight = getItemHeight(candidate);
-      const stepX = Math.max(18, Math.round(itemWidth * 0.55));
-      const stepY = Math.max(20, Math.round(itemHeight * 0.55));
+      const gap = isMobile ? 12 : 18;
+      const stepX = Math.max(gap, Math.round(itemWidth * 0.52));
+      const stepY = Math.max(gap, Math.round(itemHeight * 0.5));
       const maxX = Math.max(10, boardWidth - itemWidth - 10);
-      const maxY = Math.max(10, stageHeight - itemHeight - 10);
+      const furthestBottom = items.reduce((maxBottom, item) => {
+        if (item.id === excludeItemId) return maxBottom;
+        return Math.max(maxBottom, item.y + getItemHeight(item));
+      }, 0);
+      const searchMaxY = Math.max(
+        10,
+        stageHeight - itemHeight - 10,
+        furthestBottom + itemHeight + gap * 3,
+      );
 
-      for (let y = 10; y <= maxY; y += stepY) {
+      for (let y = 10; y <= searchMaxY; y += stepY) {
         for (let x = 10; x <= maxX; x += stepX) {
           const next = { x, y };
           if (!isOverlappingItem(candidate, next, excludeItemId)) {
@@ -441,9 +450,12 @@ export default function LiveBoard() {
         }
       }
 
-      return clampedPreferred;
+      return {
+        x: 10,
+        y: furthestBottom + gap * 2,
+      };
     },
-    [boardWidth, clampItemPosition, getItemHeight, getItemWidth, isOverlappingItem, stageHeight],
+    [boardWidth, clampItemPosition, getItemHeight, getItemWidth, isMobile, isOverlappingItem, items, stageHeight],
   );
 
   // Find pinned item
