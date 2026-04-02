@@ -1,4 +1,5 @@
 import {
+  equalTo,
   get,
   onValue,
   orderByChild,
@@ -509,20 +510,14 @@ export async function findRoomByCode(code: string): Promise<Room | null> {
   const upperCode = code.trim().toUpperCase();
   if (upperCode.length !== 6) return null;
 
-  // Query all rooms and find matching shortCode
   const roomsRef = dbRef(ensureDb(), "rooms");
-  const snapshot = await get(query(roomsRef, orderByChild("shortCode")));
+  const snapshot = await get(query(roomsRef, orderByChild("shortCode"), equalTo(upperCode)));
   const val = snapshot.val() as Record<string, Record<string, unknown>> | null;
 
   if (!val) return null;
 
-  for (const [id, data] of Object.entries(val)) {
-    if (String(data.shortCode ?? "").toUpperCase() === upperCode) {
-      return parseRoom(id, data);
-    }
-  }
-
-  return null;
+  const [match] = Object.entries(val);
+  return match ? parseRoom(match[0], match[1]) : null;
 }
 
 export async function joinRoom(roomId: string, displayName: string) {

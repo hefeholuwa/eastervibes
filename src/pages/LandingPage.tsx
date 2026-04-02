@@ -30,8 +30,12 @@ export default function LandingPage() {
         return;
       }
       navigate(`/join/${room.id}`);
-    } catch {
-      setCodeError("Something went wrong. Please try again.");
+    } catch (error) {
+      setCodeError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
       setIsJoining(false);
     }
