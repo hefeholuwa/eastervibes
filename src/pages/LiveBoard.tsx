@@ -27,7 +27,9 @@ import {
 } from "lucide-react";
 import {
   addBoardImage,
+  addBoardComment,
   addBoardNote,
+  type BoardComment,
   clearAllBoardItems,
   clearPrompt,
   deleteBoardItem,
@@ -46,6 +48,7 @@ import {
   subscribeToParticipants,
   subscribeToRoom,
   toggleReaction,
+  totalComments,
   unpinItem,
   updateBoardItemPosition,
   updateRoomSettings,
@@ -58,6 +61,24 @@ import {
   type Room,
 } from "../lib/board";
 import { cn } from "../lib/utils";
+
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+function formatRelativeTime(timestamp?: number) {
+  if (!timestamp) return "Just now";
+
+  const diffMs = timestamp - Date.now();
+  const diffMinutes = Math.round(diffMs / 60000);
+
+  if (Math.abs(diffMinutes) < 1) return "Just now";
+  if (Math.abs(diffMinutes) < 60) return relativeTimeFormatter.format(diffMinutes, "minute");
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) return relativeTimeFormatter.format(diffHours, "hour");
+
+  const diffDays = Math.round(diffHours / 24);
+  return relativeTimeFormatter.format(diffDays, "day");
+}
 
 export default function LiveBoard() {
   const { id } = useParams();
@@ -85,6 +106,9 @@ export default function LiveBoard() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageCaption, setImageCaption] = useState("");
   const [activeImage, setActiveImage] = useState<BoardItem | null>(null);
+  const [activeCommentItemId, setActiveCommentItemId] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [isSendingComment, setIsSendingComment] = useState(false);
   const [noteColor, setNoteColor] = useState<NoteColor>("yellow");
   const [selectedLane, setSelectedLane] = useState("");
   const [isPosting, setIsPosting] = useState(false);
@@ -250,14 +274,14 @@ export default function LiveBoard() {
   }, [selectedImage]);
 
   const boardWidth = isMobile
-    ? Math.max(320, viewport.width - 24)
+    ? Math.max(420, viewport.width + 96)
     : Math.min(1280, Math.max(920, viewport.width - 96));
   const boardHeight = isMobile
     ? Math.max(560, viewport.height - 170)
     : Math.max(720, viewport.height - 170);
   const isCompactBoard = viewport.width < 1100;
-  const minScale = isMobile ? 0.85 : 0.9;
-  const maxScale = isMobile ? 1.1 : 1.2;
+  const minScale = isMobile ? 0.7 : 0.9;
+  const maxScale = isMobile ? 1.05 : 1.2;
   const visibleParticipants = participants.slice(0, 5);
   const canPost = (room?.allowPosts ?? true) && !isHost ? true : true; // hosts can always post
   const isLocked = room?.lockedBoard ?? false;
@@ -270,7 +294,7 @@ export default function LiveBoard() {
         }
         return item.type === "note" ? 256 : 320;
       }
-      return item.type === "note" ? 132 : 160;
+      return item.type === "note" ? 118 : 144;
     },
     [isCompactBoard, isMobile],
   );
@@ -280,13 +304,13 @@ export default function LiveBoard() {
       if (item.type === "note") {
         const textLength = item.content?.length ?? 0;
         return isMobile
-          ? Math.min(220, 98 + Math.ceil(textLength / 50) * 18)
+          ? Math.min(200, 88 + Math.ceil(textLength / 54) * 16)
           : isCompactBoard
             ? Math.min(250, 128 + Math.ceil(textLength / 54) * 20)
             : Math.min(320, 156 + Math.ceil(textLength / 56) * 24);
       }
 
-      return isMobile ? 194 : isCompactBoard ? 236 : 300;
+      return isMobile ? 176 : isCompactBoard ? 236 : 300;
     },
     [isCompactBoard, isMobile],
   );
@@ -363,11 +387,75 @@ export default function LiveBoard() {
     [boardWidth, getItemHeight, getItemWidth, stageHeight],
   );
 
+  const isOverlappingItem = useCallback(
+    (
+      candidate: BoardItem,
+      position: { x: number; y: number },
+      excludeItemId?: string,
+    ) => {
+      const candidateWidth = getItemWidth(candidate);
+      const candidateHeight = getItemHeight(candidate);
+      const gap = isMobile ? 12 : 18;
+
+      return items.some((existingItem) => {
+        if (existingItem.id === excludeItemId) return false;
+
+        const existingWidth = getItemWidth(existingItem);
+        const existingHeight = getItemHeight(existingItem);
+
+        return !(
+          position.x + candidateWidth + gap <= existingItem.x ||
+          existingItem.x + existingWidth + gap <= position.x ||
+          position.y + candidateHeight + gap <= existingItem.y ||
+          existingItem.y + existingHeight + gap <= position.y
+        );
+      });
+    },
+    [getItemHeight, getItemWidth, isMobile, items],
+  );
+
+  const findAvailablePosition = useCallback(
+    (
+      candidate: BoardItem,
+      preferredPosition: { x: number; y: number },
+      excludeItemId?: string,
+    ) => {
+      const clampedPreferred = clampItemPosition(candidate, preferredPosition);
+      if (!isOverlappingItem(candidate, clampedPreferred, excludeItemId)) {
+        return clampedPreferred;
+      }
+
+      const itemWidth = getItemWidth(candidate);
+      const itemHeight = getItemHeight(candidate);
+      const stepX = Math.max(18, Math.round(itemWidth * 0.55));
+      const stepY = Math.max(20, Math.round(itemHeight * 0.55));
+      const maxX = Math.max(10, boardWidth - itemWidth - 10);
+      const maxY = Math.max(10, stageHeight - itemHeight - 10);
+
+      for (let y = 10; y <= maxY; y += stepY) {
+        for (let x = 10; x <= maxX; x += stepX) {
+          const next = { x, y };
+          if (!isOverlappingItem(candidate, next, excludeItemId)) {
+            return next;
+          }
+        }
+      }
+
+      return clampedPreferred;
+    },
+    [boardWidth, clampItemPosition, getItemHeight, getItemWidth, isOverlappingItem, stageHeight],
+  );
+
   // Find pinned item
   const pinnedItem = useMemo(() => {
     if (!room?.pinnedItemId) return null;
     return items.find((item) => item.id === room.pinnedItemId) ?? null;
   }, [items, room?.pinnedItemId]);
+
+  const activeCommentItem = useMemo(
+    () => items.find((item) => item.id === activeCommentItemId) ?? null,
+    [activeCommentItemId, items],
+  );
 
   // Smart placement — stay within the visible stage on mobile
   const getSmartPosition = useCallback(
@@ -383,26 +471,27 @@ export default function LiveBoard() {
         status: "approved" as const,
         reactions: { heart: 0, amen: 0, clap: 0, fire: 0 },
         reactedBy: {},
+        comments: [],
       };
 
       const itemWidth = getItemWidth(sampleItem);
       const itemHeight = getItemHeight(sampleItem);
-      const columns = isMobile ? 2 : Math.max(3, Math.floor(boardWidth / 280));
+      const columns = isMobile ? 3 : Math.max(3, Math.floor(boardWidth / 280));
       const colWidth = isMobile
-        ? Math.max(itemWidth + 24, Math.floor((boardWidth - 20) / columns))
+        ? Math.max(itemWidth + 20, Math.floor((boardWidth - 24) / columns))
         : Math.max(itemWidth + 14, Math.floor(boardWidth / columns));
-      const rowHeight = itemHeight + (isMobile ? 34 : 28);
+      const rowHeight = itemHeight + (isMobile ? 28 : 28);
       const index = items.length;
       const col = index % columns;
       const row = Math.floor(index / columns);
       const rawPosition = {
-        x: isMobile ? 12 + col * colWidth + Math.random() * 12 : 16 + col * colWidth + Math.random() * 10,
-        y: isMobile ? 20 + row * rowHeight + Math.random() * 14 : 18 + row * rowHeight + Math.random() * 10,
+        x: isMobile ? 10 + col * colWidth + Math.random() * 10 : 16 + col * colWidth + Math.random() * 10,
+        y: isMobile ? 18 + row * rowHeight + Math.random() * 12 : 18 + row * rowHeight + Math.random() * 10,
       };
 
-      return clampItemPosition(sampleItem, rawPosition);
+      return findAvailablePosition(sampleItem, rawPosition);
     },
-    [boardWidth, clampItemPosition, effectName, getItemHeight, getItemWidth, isMobile, items.length, myParticipantId],
+    [boardWidth, effectName, findAvailablePosition, getItemHeight, getItemWidth, isMobile, items.length, myParticipantId],
   );
 
   const handlePointerDown = (e: React.PointerEvent, itemId: string) => {
@@ -457,7 +546,18 @@ export default function LiveBoard() {
     if (!position) return;
 
     try {
-      await updateBoardItemPosition(roomId, draggingId, position.x, position.y);
+      const item = items.find((entry) => entry.id === draggingId);
+      if (!item) return;
+
+      const resolvedPosition = findAvailablePosition(item, position, draggingId);
+
+      setItems((currentItems) =>
+        currentItems.map((entry) =>
+          entry.id === draggingId ? { ...entry, ...resolvedPosition } : entry,
+        ),
+      );
+
+      await updateBoardItemPosition(roomId, draggingId, resolvedPosition.x, resolvedPosition.y);
     } catch {
       setError("We couldn't save that move. Please try again.");
     }
@@ -558,6 +658,32 @@ export default function LiveBoard() {
     if (item.type !== "image") return;
     setActiveImage(item);
   }, []);
+
+  const handleOpenComments = useCallback((item: BoardItem) => {
+    setActiveCommentItemId(item.id);
+    setCommentDraft("");
+  }, []);
+
+  const handleSubmitComment = useCallback(async () => {
+    if (!roomId || !activeCommentItem) return;
+
+    setIsSendingComment(true);
+    try {
+      await addBoardComment(roomId, activeCommentItem.id, {
+        author: effectName,
+        content: commentDraft,
+      });
+      setCommentDraft("");
+    } catch (commentError) {
+      setError(
+        commentError instanceof Error
+          ? commentError.message
+          : "We couldn't send that comment right now.",
+      );
+    } finally {
+      setIsSendingComment(false);
+    }
+  }, [activeCommentItem, commentDraft, effectName, roomId]);
 
   return (
     <div className="h-[100svh] w-screen overflow-hidden bg-surface relative font-body">
@@ -819,6 +945,9 @@ export default function LiveBoard() {
               <p className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider mt-2">
                 {room?.anonymousMode ? "Anonymous" : pinnedItem.author}
               </p>
+              <p className="mt-1 text-[10px] text-on-surface-variant/70">
+                {formatRelativeTime(pinnedItem.createdAt)}
+              </p>
             </div>
           </div>
         ) : null}
@@ -851,15 +980,15 @@ export default function LiveBoard() {
                     "group absolute shadow-md hover:shadow-lg transition-shadow select-none",
                     canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                     item.type === "note"
-                      ? `w-[8.25rem] sm:w-48 lg:w-64 p-2.5 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
-                      : "w-40 sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-1.5 sm:p-2.5 lg:p-3",
+                      ? `w-[7.4rem] sm:w-48 lg:w-64 p-2 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
+                      : "w-[8.9rem] sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-1.5 sm:p-2.5 lg:p-3",
                     draggingId === item.id ? "z-50 shadow-xl scale-105" : "z-10",
                   )}
                   style={{ left: displayPosition.x, top: displayPosition.y, touchAction: "none" }}
                 >
                   {/* Actions — own posts or host */}
                   {canManage ? (
-                    <div className="absolute z-20 top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <div className="absolute z-20 top-2 right-2 hidden gap-1 sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       {isHost ? (
                         <button
                           type="button"
@@ -885,10 +1014,22 @@ export default function LiveBoard() {
 
                   {item.type === "note" ? (
                     <>
-                      <p className="text-[0.8rem] sm:text-base lg:text-lg font-medium text-on-surface mb-1.5 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
+                      <p className="text-[0.74rem] sm:text-base lg:text-lg font-medium text-on-surface mb-1 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
                       {item.lane ? (<span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-black/5 text-on-surface-variant/60 px-2 py-0.5 rounded-full mb-2">{item.lane}</span>) : null}
-                      <div className="text-[10px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
+                      <div className="text-[9px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                         {room?.anonymousMode ? "Anonymous" : item.author}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-on-surface-variant/70">
+                        <span>{formatRelativeTime(item.createdAt)}</span>
+                        <span aria-hidden="true">•</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleOpenComments(item); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="font-bold text-on-surface-variant transition-colors hover:text-on-surface"
+                        >
+                          {totalComments(item)} comment{totalComments(item) === 1 ? "" : "s"}
+                        </button>
                       </div>
                     </>
                   ) : (
@@ -900,24 +1041,60 @@ export default function LiveBoard() {
                           onPointerDown={(e) => e.stopPropagation()}
                           className="block w-full overflow-hidden rounded-xl text-left"
                         >
-                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-24 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-20 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
                         </button>
-                        <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 p-2 rounded-full bg-inverse-surface/70 text-inverse-on-surface opacity-100 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
+                        <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 hidden p-2 rounded-full bg-inverse-surface/70 text-inverse-on-surface sm:block sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
                           <Download className="w-4 h-4" />
                         </a>
                       </div>
                       <div className="mt-1.5 px-0.5 pb-1">
-                        {item.caption ? <p className="text-xs sm:text-[0.82rem] lg:text-sm text-on-surface/80 leading-snug line-clamp-2 mb-1">{item.caption}</p> : null}
+                        {item.caption ? <p className="text-[11px] sm:text-[0.82rem] lg:text-sm text-on-surface/80 leading-snug line-clamp-2 mb-1">{item.caption}</p> : null}
                         {item.lane ? (<span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-black/5 text-on-surface-variant/60 px-2 py-0.5 rounded-full mb-1">{item.lane}</span>) : null}
-                        <p className="text-[10px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
+                        <p className="text-[9px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                           {room?.anonymousMode ? "Anonymous" : item.author}
                         </p>
-                        <div className="mt-2 flex gap-2">
+                        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-on-surface-variant/70">
+                          <span>{formatRelativeTime(item.createdAt)}</span>
+                          <span aria-hidden="true">•</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleOpenComments(item); }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="font-bold text-on-surface-variant transition-colors hover:text-on-surface"
+                          >
+                            {totalComments(item)} comment{totalComments(item) === 1 ? "" : "s"}
+                          </button>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2 sm:hidden">
+                          {isHost ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); room?.pinnedItemId === item.id ? unpinItem(roomId) : pinItem(roomId, item.id); }}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors"
+                              title={room?.pinnedItemId === item.id ? "Unpin" : "Pin"}
+                            >
+                              {room?.pinnedItemId === item.id ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                            </button>
+                          ) : null}
+                          {canManage ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (window.confirm("Delete this post?")) { deleteBoardItem(roomId, item.id); } }}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm"
+                              title="Delete post"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleOpenImage(item); }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1.5 text-[11px] font-bold text-on-surface hover:bg-surface-variant transition-colors"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-surface-container-low px-3 py-2 text-[11px] font-bold text-on-surface hover:bg-surface-variant transition-colors"
                           >
                             <Eye className="h-3.5 w-3.5" /> View
                           </button>
@@ -926,7 +1103,7 @@ export default function LiveBoard() {
                             download={`vibeboard-${item.author}-${item.id}.jpg`}
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1.5 text-[11px] font-bold text-on-surface hover:bg-surface-variant transition-colors"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-surface-container-low px-3 py-2 text-[11px] font-bold text-on-surface hover:bg-surface-variant transition-colors"
                           >
                             <Download className="h-3.5 w-3.5" /> Save
                           </a>
@@ -1117,6 +1294,84 @@ export default function LiveBoard() {
                 className="max-h-[75svh] w-full rounded-[1.5rem] object-contain bg-black/5"
                 referrerPolicy="no-referrer"
               />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeCommentItem ? (
+        <div className="fixed inset-0 z-[68] bg-inverse-surface/45 backdrop-blur-sm flex items-end sm:items-center justify-center">
+          <div className="w-full max-w-lg rounded-t-[2rem] sm:rounded-[2rem] bg-surface-container-lowest shadow-2xl max-h-[88svh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-outline-variant/15 px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">Comments</p>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {room?.anonymousMode ? "Anonymous" : activeCommentItem.author} · {formatRelativeTime(activeCommentItem.createdAt)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveCommentItemId(null)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-on-surface"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[52svh] overflow-y-auto px-5 py-4 space-y-3">
+              {activeCommentItem.type === "note" ? (
+                <div className={cn("rounded-2xl px-4 py-3 text-sm text-on-surface", noteColorClass(activeCommentItem.color))}>
+                  {activeCommentItem.content}
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-2xl bg-surface-container-low">
+                  <img
+                    src={activeCommentItem.imageUrl}
+                    alt={activeCommentItem.caption || `${activeCommentItem.author}'s image`}
+                    className="h-40 w-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  {activeCommentItem.caption ? (
+                    <p className="px-4 py-3 text-sm text-on-surface">{activeCommentItem.caption}</p>
+                  ) : null}
+                </div>
+              )}
+
+              {activeCommentItem.comments.length > 0 ? (
+                activeCommentItem.comments.map((comment: BoardComment) => (
+                  <div key={comment.id} className="rounded-2xl bg-surface-container-low px-4 py-3">
+                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      <span>{room?.anonymousMode ? "Anonymous" : comment.author}</span>
+                      <span aria-hidden="true">•</span>
+                      <span className="normal-case tracking-normal font-medium">{formatRelativeTime(comment.createdAt)}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-on-surface">{comment.content}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-outline-variant/25 px-4 py-5 text-center text-sm text-on-surface-variant">
+                  No comments yet. Start the conversation.
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-outline-variant/15 bg-surface-container-low px-5 py-4">
+              <div className="flex gap-3">
+                <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  placeholder="Drop a comment..."
+                  className="min-h-20 flex-1 resize-none rounded-2xl border-2 border-transparent bg-surface-container-lowest px-4 py-3 text-sm outline-none transition-colors focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={handleSubmitComment}
+                  disabled={isSendingComment || !commentDraft.trim()}
+                  className="self-end rounded-full bg-primary px-5 py-3 text-sm font-bold text-on-primary transition-colors hover:bg-primary-dim disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSendingComment ? "Sending..." : "Send"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

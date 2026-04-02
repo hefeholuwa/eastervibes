@@ -133,6 +133,15 @@ export type BoardItem = {
   status: "approved" | "pending";
   reactions: Record<ReactionType, number>;
   reactedBy: Record<string, ReactionType>;
+  comments: BoardComment[];
+  createdAt?: number;
+};
+
+export type BoardComment = {
+  id: string;
+  author: string;
+  participantId: string;
+  content: string;
   createdAt?: number;
 };
 
@@ -205,6 +214,10 @@ function pendingItemsPath(roomId: string) {
 
 function participantsPath(roomId: string) {
   return `rooms/${roomId}/participants`;
+}
+
+function commentsPath(roomId: string, itemId: string) {
+  return `${itemsPath(roomId)}/${itemId}/comments`;
 }
 
 function roomRef(roomId: string) {
@@ -289,6 +302,21 @@ function parseReactedBy(raw: unknown): Record<string, ReactionType> {
   return result;
 }
 
+function parseComments(raw: unknown): BoardComment[] {
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, Record<string, unknown>>;
+
+  return Object.entries(obj)
+    .map(([id, value]) => ({
+      id,
+      author: String(value.author ?? "Guest"),
+      participantId: typeof value.participantId === "string" ? value.participantId : "",
+      content: String(value.content ?? ""),
+      createdAt: typeof value.createdAt === "number" ? value.createdAt : undefined,
+    }))
+    .sort((left, right) => (left.createdAt ?? 0) - (right.createdAt ?? 0));
+}
+
 function parseItem(id: string, value: Record<string, unknown>): BoardItem {
   return {
     id,
@@ -306,6 +334,7 @@ function parseItem(id: string, value: Record<string, unknown>): BoardItem {
     status: (value.status as "approved" | "pending") ?? "approved",
     reactions: parseReactions(value.reactions),
     reactedBy: parseReactedBy(value.reactedBy),
+    comments: parseComments(value.comments),
     createdAt: typeof value.createdAt === "number" ? value.createdAt : undefined,
   };
 }
@@ -683,6 +712,7 @@ function buildItemPayload(
     status: base.status ?? "approved",
     reactions: { heart: 0, amen: 0, clap: 0, fire: 0 },
     reactedBy: {},
+    comments: {},
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -742,6 +772,31 @@ export async function updateBoardItemVisibility(
 
 export async function deleteBoardItem(roomId: string, itemId: string) {
   await remove(dbRef(ensureDb(), `${itemsPath(roomId)}/${itemId}`));
+}
+
+export async function addBoardComment(
+  roomId: string,
+  itemId: string,
+  input: { author: string; content: string },
+) {
+  const trimmed = input.content.trim();
+  if (!trimmed) {
+    throw new Error("Write a comment before sending.");
+  }
+
+  const participantId = getParticipantId(roomId);
+  const newCommentRef = push(dbRef(ensureDb(), commentsPath(roomId, itemId)));
+
+  await set(newCommentRef, {
+    author: input.author,
+    participantId,
+    content: trimmed,
+    createdAt: serverTimestamp(),
+  });
+
+  await update(dbRef(ensureDb(), `${itemsPath(roomId)}/${itemId}`), {
+    updatedAt: serverTimestamp(),
+  });
 }
 
 // ─── Approval queue ───────────────────────────────────────────────────────────
@@ -861,4 +916,8 @@ export async function endRoom(roomId: string) {
 export function totalReactions(item: BoardItem): number {
   const r = item.reactions;
   return (r.heart ?? 0) + (r.amen ?? 0) + (r.clap ?? 0) + (r.fire ?? 0);
+}
+
+export function totalComments(item: BoardItem): number {
+  return item.comments.length;
 }
