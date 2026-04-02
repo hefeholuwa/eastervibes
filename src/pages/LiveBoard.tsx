@@ -270,7 +270,7 @@ export default function LiveBoard() {
         }
         return item.type === "note" ? 256 : 320;
       }
-      return item.type === "note" ? 156 : 188;
+      return item.type === "note" ? 144 : 172;
     },
     [isCompactBoard, isMobile],
   );
@@ -280,13 +280,13 @@ export default function LiveBoard() {
       if (item.type === "note") {
         const textLength = item.content?.length ?? 0;
         return isMobile
-          ? Math.min(260, 120 + Math.ceil(textLength / 44) * 20)
+          ? Math.min(236, 108 + Math.ceil(textLength / 46) * 18)
           : isCompactBoard
             ? Math.min(250, 128 + Math.ceil(textLength / 54) * 20)
             : Math.min(320, 156 + Math.ceil(textLength / 56) * 24);
       }
 
-      return isMobile ? 228 : isCompactBoard ? 236 : 300;
+      return isMobile ? 208 : isCompactBoard ? 236 : 300;
     },
     [isCompactBoard, isMobile],
   );
@@ -827,21 +827,21 @@ export default function LiveBoard() {
                     "group absolute shadow-md hover:shadow-lg transition-shadow select-none",
                     canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                     item.type === "note"
-                      ? `w-40 sm:w-48 lg:w-64 p-3.5 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
-                      : "w-[11.75rem] sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-2 sm:p-2.5 lg:p-3",
+                      ? `w-36 sm:w-48 lg:w-64 p-3 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
+                      : "w-[10.75rem] sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-1.5 sm:p-2.5 lg:p-3",
                     draggingId === item.id ? "z-50 shadow-xl scale-105" : "z-10",
                   )}
                   style={{ left: displayPosition.x, top: displayPosition.y, touchAction: "none" }}
                 >
                   {/* Actions — own posts or host */}
                   {(isOwn || isHost) ? (
-                    <div className="absolute z-20 top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute z-20 top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       {isHost ? (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); room?.pinnedItemId === item.id ? unpinItem(roomId) : pinItem(roomId, item.id); }}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-full bg-inverse-surface/60 text-inverse-on-surface hover:bg-inverse-surface/80 backdrop-blur-sm"
+                          className="p-1.5 rounded-full bg-inverse-surface/70 text-inverse-on-surface hover:bg-inverse-surface/80 backdrop-blur-sm"
                           title={room?.pinnedItemId === item.id ? "Unpin" : "Pin"}
                         >
                           {room?.pinnedItemId === item.id ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
@@ -851,7 +851,7 @@ export default function LiveBoard() {
                         type="button"
                         onClick={(e) => { e.stopPropagation(); if (window.confirm("Delete this post?")) { deleteBoardItem(roomId, item.id); } }}
                         onPointerDown={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-full bg-red-500/80 text-white hover:bg-red-600 backdrop-blur-sm"
+                        className="p-1.5 rounded-full bg-red-500/90 text-white hover:bg-red-600 backdrop-blur-sm shadow-sm"
                         title="Delete post"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -861,7 +861,7 @@ export default function LiveBoard() {
 
                   {item.type === "note" ? (
                     <>
-                      <p className="text-[0.95rem] sm:text-base lg:text-lg font-medium text-on-surface mb-2.5 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
+                      <p className="text-[0.88rem] sm:text-base lg:text-lg font-medium text-on-surface mb-2 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
                       {item.lane ? (<span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-black/5 text-on-surface-variant/60 px-2 py-0.5 rounded-full mb-2">{item.lane}</span>) : null}
                       <div className="text-[10px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                         {room?.anonymousMode ? "Anonymous" : item.author}
@@ -876,9 +876,9 @@ export default function LiveBoard() {
                           onPointerDown={(e) => e.stopPropagation()}
                           className="block w-full overflow-hidden rounded-xl text-left"
                         >
-                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-32 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-28 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
                         </button>
-                        <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 p-2 rounded-full bg-inverse-surface/60 text-inverse-on-surface opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
+                        <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 p-2 rounded-full bg-inverse-surface/70 text-inverse-on-surface opacity-100 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
                           <Download className="w-4 h-4" />
                         </a>
                       </div>
