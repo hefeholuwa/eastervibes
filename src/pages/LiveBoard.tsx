@@ -270,7 +270,7 @@ export default function LiveBoard() {
         }
         return item.type === "note" ? 256 : 320;
       }
-      return item.type === "note" ? 144 : 172;
+      return item.type === "note" ? 132 : 160;
     },
     [isCompactBoard, isMobile],
   );
@@ -280,13 +280,13 @@ export default function LiveBoard() {
       if (item.type === "note") {
         const textLength = item.content?.length ?? 0;
         return isMobile
-          ? Math.min(236, 108 + Math.ceil(textLength / 46) * 18)
+          ? Math.min(220, 98 + Math.ceil(textLength / 50) * 18)
           : isCompactBoard
             ? Math.min(250, 128 + Math.ceil(textLength / 54) * 20)
             : Math.min(320, 156 + Math.ceil(textLength / 56) * 24);
       }
 
-      return isMobile ? 208 : isCompactBoard ? 236 : 300;
+      return isMobile ? 194 : isCompactBoard ? 236 : 300;
     },
     [isCompactBoard, isMobile],
   );
@@ -388,14 +388,16 @@ export default function LiveBoard() {
       const itemWidth = getItemWidth(sampleItem);
       const itemHeight = getItemHeight(sampleItem);
       const columns = isMobile ? 2 : Math.max(3, Math.floor(boardWidth / 280));
-      const colWidth = Math.max(itemWidth + 14, Math.floor(boardWidth / columns));
-      const rowHeight = itemHeight + (isMobile ? 18 : 28);
+      const colWidth = isMobile
+        ? Math.max(itemWidth + 24, Math.floor((boardWidth - 20) / columns))
+        : Math.max(itemWidth + 14, Math.floor(boardWidth / columns));
+      const rowHeight = itemHeight + (isMobile ? 34 : 28);
       const index = items.length;
       const col = index % columns;
       const row = Math.floor(index / columns);
       const rawPosition = {
-        x: 16 + col * colWidth + Math.random() * 10,
-        y: 18 + row * rowHeight + Math.random() * 10,
+        x: isMobile ? 12 + col * colWidth + Math.random() * 12 : 16 + col * colWidth + Math.random() * 10,
+        y: isMobile ? 20 + row * rowHeight + Math.random() * 14 : 18 + row * rowHeight + Math.random() * 10,
       };
 
       return clampItemPosition(sampleItem, rawPosition);
@@ -764,7 +766,7 @@ export default function LiveBoard() {
         </div>
       ) : null}
 
-      <main className="absolute inset-0 overflow-auto bg-surface-container-low px-3 pt-16 pb-28 sm:bg-[radial-gradient(#e8e2d2_1px,transparent_1px)] sm:[background-size:24px_24px] sm:px-0 sm:pt-28 sm:pb-32">
+      <main className="absolute inset-0 overflow-auto bg-[radial-gradient(#e8e2d2_1px,transparent_1px)] [background-size:24px_24px] px-3 pt-16 pb-28 sm:px-0 sm:pt-28 sm:pb-32">
         {error ? (
           <div className={cn("mx-auto mt-20 max-w-xl rounded-[2rem] px-6 py-5 shadow-sm", error.startsWith("✅") ? "border border-green-500/20 bg-green-50 text-green-700" : "border border-error/20 bg-error/10 text-error")}>
             {error}
@@ -824,7 +826,12 @@ export default function LiveBoard() {
         {!error ? (
           <div
             ref={boardRef}
-            className="relative mx-auto origin-top overflow-hidden rounded-[2rem] border border-outline-variant/15 bg-[radial-gradient(#e8e2d2_1px,transparent_1px)] [background-size:24px_24px] shadow-[0_18px_50px_rgba(47,33,17,0.08)] transition-transform duration-200 sm:rounded-[2.4rem]"
+            className={cn(
+              "relative mx-auto origin-top transition-transform duration-200",
+              isMobile
+                ? "overflow-visible bg-transparent"
+                : "overflow-hidden rounded-[2.4rem] border border-outline-variant/15 bg-[radial-gradient(#e8e2d2_1px,transparent_1px)] [background-size:24px_24px] shadow-[0_18px_50px_rgba(47,33,17,0.08)]",
+            )}
             style={{ width: boardWidth, height: stageHeight, transform: `scale(${viewScale})` }}
           >
             {filteredItems.map((item) => {
@@ -844,8 +851,8 @@ export default function LiveBoard() {
                     "group absolute shadow-md hover:shadow-lg transition-shadow select-none",
                     canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                     item.type === "note"
-                      ? `w-36 sm:w-48 lg:w-64 p-3 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
-                      : "w-[10.75rem] sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-1.5 sm:p-2.5 lg:p-3",
+                      ? `w-[8.25rem] sm:w-48 lg:w-64 p-2.5 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
+                      : "w-40 sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-1.5 sm:p-2.5 lg:p-3",
                     draggingId === item.id ? "z-50 shadow-xl scale-105" : "z-10",
                   )}
                   style={{ left: displayPosition.x, top: displayPosition.y, touchAction: "none" }}
@@ -878,7 +885,7 @@ export default function LiveBoard() {
 
                   {item.type === "note" ? (
                     <>
-                      <p className="text-[0.88rem] sm:text-base lg:text-lg font-medium text-on-surface mb-2 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
+                      <p className="text-[0.8rem] sm:text-base lg:text-lg font-medium text-on-surface mb-1.5 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
                       {item.lane ? (<span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-black/5 text-on-surface-variant/60 px-2 py-0.5 rounded-full mb-2">{item.lane}</span>) : null}
                       <div className="text-[10px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                         {room?.anonymousMode ? "Anonymous" : item.author}
@@ -893,7 +900,7 @@ export default function LiveBoard() {
                           onPointerDown={(e) => e.stopPropagation()}
                           className="block w-full overflow-hidden rounded-xl text-left"
                         >
-                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-28 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-24 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
                         </button>
                         <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 p-2 rounded-full bg-inverse-surface/70 text-inverse-on-surface opacity-100 sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
                           <Download className="w-4 h-4" />
