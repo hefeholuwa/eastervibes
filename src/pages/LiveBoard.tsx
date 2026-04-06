@@ -274,7 +274,7 @@ export default function LiveBoard() {
   }, [selectedImage]);
 
   const boardWidth = isMobile
-    ? Math.max(420, viewport.width + 96)
+    ? Math.max(280, viewport.width - 24)
     : Math.min(1280, Math.max(920, viewport.width - 96));
   const boardHeight = isMobile
     ? Math.max(560, viewport.height - 170)
@@ -360,6 +360,42 @@ export default function LiveBoard() {
     if (!activeLane) return items;
     return items.filter((item) => item.lane === activeLane);
   }, [items, activeLane]);
+
+  const organizedSections = useMemo(() => {
+    const sortedItems = [...filteredItems].sort((left, right) => {
+      if (room?.pinnedItemId === left.id) return -1;
+      if (room?.pinnedItemId === right.id) return 1;
+      return (right.createdAt ?? 0) - (left.createdAt ?? 0);
+    });
+
+    if (room?.lanes && room.lanes.length > 0) {
+      const laneOrder = activeLane ? [activeLane] : room.lanes;
+      const sections = laneOrder.map((lane) => ({
+        id: lane,
+        title: lane,
+        items: sortedItems.filter((item) => item.lane === lane),
+      }));
+
+      const unassignedItems = sortedItems.filter((item) => !item.lane);
+      if (unassignedItems.length > 0 && !activeLane) {
+        sections.push({
+          id: "general",
+          title: "General",
+          items: unassignedItems,
+        });
+      }
+
+      return sections.filter((section) => section.items.length > 0);
+    }
+
+    return [
+      {
+        id: "all-posts",
+        title: "Latest Posts",
+        items: sortedItems,
+      },
+    ];
+  }, [activeLane, filteredItems, room?.lanes, room?.pinnedItemId]);
 
   const stageHeight = useMemo(() => {
     const furthestItemBottom = filteredItems.reduce((maxBottom, item) => {
@@ -488,7 +524,7 @@ export default function LiveBoard() {
 
       const itemWidth = getItemWidth(sampleItem);
       const itemHeight = getItemHeight(sampleItem);
-      const columns = isMobile ? 3 : Math.max(3, Math.floor(boardWidth / 280));
+      const columns = isMobile ? 1 : Math.max(3, Math.floor(boardWidth / 280));
       const colWidth = isMobile
         ? Math.max(itemWidth + 20, Math.floor((boardWidth - 24) / columns))
         : Math.max(itemWidth + 14, Math.floor(boardWidth / columns));
@@ -497,8 +533,8 @@ export default function LiveBoard() {
       const col = index % columns;
       const row = Math.floor(index / columns);
       const rawPosition = {
-        x: isMobile ? 10 + col * colWidth + Math.random() * 10 : 16 + col * colWidth + Math.random() * 10,
-        y: isMobile ? 18 + row * rowHeight + Math.random() * 12 : 18 + row * rowHeight + Math.random() * 10,
+        x: isMobile ? 10 + col * colWidth : 16 + col * colWidth,
+        y: isMobile ? 18 + row * rowHeight : 18 + row * rowHeight,
       };
 
       return findAvailablePosition(sampleItem, rawPosition);
@@ -968,35 +1004,45 @@ export default function LiveBoard() {
           <div
             ref={boardRef}
             className={cn(
-              "relative mx-auto origin-top transition-transform duration-200",
-              isMobile
-                ? "overflow-visible bg-transparent"
-                : "overflow-hidden rounded-[2.4rem] border border-outline-variant/15 bg-[radial-gradient(#e8e2d2_1px,transparent_1px)] [background-size:24px_24px] shadow-[0_18px_50px_rgba(47,33,17,0.08)]",
+              "mx-auto origin-top rounded-[2rem] border border-outline-variant/15 bg-surface-container-lowest/75 p-3 shadow-[0_18px_50px_rgba(47,33,17,0.08)] transition-transform duration-200 sm:p-5",
+              isMobile ? "overflow-visible" : "backdrop-blur-sm",
             )}
-            style={{ width: boardWidth, height: stageHeight, transform: `scale(${viewScale})` }}
+            style={{ width: boardWidth, transform: isMobile ? "none" : `scale(${viewScale})` }}
           >
-            {filteredItems.map((item) => {
+            <div className="space-y-5 sm:space-y-6">
+              {organizedSections.map((section) => (
+                <section
+                  key={section.id}
+                  className="rounded-[1.75rem] border border-outline-variant/15 bg-surface-container-low p-3 sm:p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+                    <div>
+                      <h2 className="font-headline text-xl font-bold capitalize text-on-surface sm:text-2xl">
+                        {section.title}
+                      </h2>
+                      <p className="text-xs font-medium uppercase tracking-[0.18em] text-on-surface-variant">
+                        {section.items.length} item{section.items.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {section.items.map((item) => {
               const canManage = canManageItem(item);
               const canDrag = canMoveItem(item);
               const myReaction = myParticipantId ? item.reactedBy[myParticipantId] : undefined;
-              const displayPosition = clampItemPosition(item, { x: item.x, y: item.y });
 
               return (
                 <div
                   key={item.id}
-                  onPointerDown={(event) => handlePointerDown(event, item.id)}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
                   className={cn(
-                    "group absolute shadow-md hover:shadow-lg transition-shadow select-none",
-                    canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default",
+                    "group relative min-h-full shadow-md hover:shadow-lg transition-shadow",
+                    canDrag ? "cursor-default" : "cursor-default",
                     item.type === "note"
-                      ? `w-[7.4rem] sm:w-48 lg:w-64 p-2 sm:p-4 lg:p-6 rounded-2xl ${noteColorClass(item.color)}`
-                      : "w-[8.9rem] sm:w-[15.5rem] lg:w-80 rounded-2xl overflow-hidden bg-surface-container-lowest p-1.5 sm:p-2.5 lg:p-3",
-                    draggingId === item.id ? "z-50 shadow-xl scale-105" : "z-10",
+                      ? `p-4 sm:p-5 rounded-2xl ${noteColorClass(item.color)}`
+                      : "rounded-2xl overflow-hidden bg-surface-container-lowest p-2.5 sm:p-3",
+                    room?.pinnedItemId === item.id ? "ring-2 ring-primary/35" : "",
                   )}
-                  style={{ left: displayPosition.x, top: displayPosition.y, touchAction: "none" }}
                 >
                   {/* Actions — own posts or host */}
                   {canManage ? (
@@ -1026,7 +1072,7 @@ export default function LiveBoard() {
 
                   {item.type === "note" ? (
                     <>
-                      <p className="text-[0.74rem] sm:text-base lg:text-lg font-medium text-on-surface mb-1 sm:mb-3 lg:mb-4 leading-relaxed">{item.content}</p>
+                      <p className="text-sm sm:text-base lg:text-lg font-medium text-on-surface mb-2 sm:mb-3 leading-relaxed">{item.content}</p>
                       {item.lane ? (<span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-black/5 text-on-surface-variant/60 px-2 py-0.5 rounded-full mb-2">{item.lane}</span>) : null}
                       <div className="text-[9px] sm:text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                         {room?.anonymousMode ? "Anonymous" : item.author}
@@ -1053,7 +1099,7 @@ export default function LiveBoard() {
                           onPointerDown={(e) => e.stopPropagation()}
                           className="block w-full overflow-hidden rounded-xl text-left"
                         >
-                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-20 sm:h-36 lg:h-48 object-cover rounded-xl" referrerPolicy="no-referrer" />
+                          <img src={item.imageUrl} alt={`${item.author}'s post`} className="w-full h-40 sm:h-52 object-cover rounded-xl" referrerPolicy="no-referrer" />
                         </button>
                         <a href={item.imageUrl} download={`vibeboard-${item.author}-${item.id}.jpg`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute top-2 right-2 hidden p-2 rounded-full bg-inverse-surface/70 text-inverse-on-surface sm:block sm:opacity-0 sm:group-hover/img:opacity-100 transition-opacity hover:bg-inverse-surface/80 backdrop-blur-sm" title="Download image">
                           <Download className="w-4 h-4" />
@@ -1148,19 +1194,14 @@ export default function LiveBoard() {
                   </div>
                 </div>
               );
-            })}
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
           </div>
         ) : null}
       </main>
-
-      {/* Mobile zoom */}
-      <div className="pointer-events-none absolute right-4 bottom-[max(5.75rem,calc(env(safe-area-inset-bottom)+5.25rem))] z-20 sm:hidden">
-        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-outline-variant/15 bg-surface-container-lowest/95 px-1.5 py-1.5 shadow-md backdrop-blur-xl">
-          <button type="button" onClick={() => setViewScale((s) => Math.max(minScale, Number((s - 0.08).toFixed(2))))} className="rounded-full p-2 text-on-surface hover:bg-surface-variant transition-colors"><ZoomOut className="h-4 w-4" /></button>
-          <span className="min-w-10 text-center text-[10px] font-bold text-on-surface-variant tabular-nums">{Math.round(viewScale * 100)}%</span>
-          <button type="button" onClick={() => setViewScale((s) => Math.min(maxScale, Number((s + 0.08).toFixed(2))))} className="rounded-full p-2 text-on-surface hover:bg-surface-variant transition-colors"><ZoomIn className="h-4 w-4" /></button>
-        </div>
-      </div>
 
       {/* Desktop zoom */}
       <div className="pointer-events-none absolute left-1/2 top-[5.6rem] z-10 hidden -translate-x-1/2 sm:block">
